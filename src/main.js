@@ -45,6 +45,19 @@ const settings = { hd: false, mode: "strip", rtl: false, ...store.get("settings"
 const saveSettings = () => store.set("settings", settings);
 const readHistory = () => store.get("history", {});
 
+// Your library: series you starred, kept in this browser like the reading history
+const readLibrary = () => store.get("library", {});
+const inLibrary = (id) => id in readLibrary();
+function toggleLibrary(m) {
+  const lib = readLibrary();
+  if (lib[m.id]) delete lib[m.id];
+  else lib[m.id] = { mangaId: m.id, title: titleOf(m), cover: coverOf(m), t: Date.now() };
+  const added = !!lib[m.id];
+  const newest = Object.values(lib).sort((a, b) => b.t - a.t).slice(0, 200);
+  store.set("library", Object.fromEntries(newest.map((x) => [x.mangaId, x])));
+  return added;
+}
+
 // ---------- State ----------
 let ws = null;
 let applying = false;    // true while applying someone else's update
@@ -173,6 +186,7 @@ function showHome() {
   leaveReader();
   setBackdrop("");
   const recent = Object.values(readHistory()).sort((a, b) => b.t - a.t);
+  const library = Object.values(readLibrary()).sort((a, b) => b.t - a.t);
   const popular = h("div", { className: "row" }, ...skeletons(8));
   const latest = h("div", { className: "row" }, ...skeletons(8));
 
@@ -187,6 +201,11 @@ function showHome() {
       sub: `${e.label.split(" – ")[0]} · p. ${e.page + 1}/${e.total || "?"}`,
       progress: e.total ? (e.page + 1) / e.total : 0,
       onclick: () => resume(e),
+    })))) : null,
+    library.length ? section("Your library", h("div", { className: "row" }, ...library.map((e) => card({
+      cover: e.cover,
+      name: e.title,
+      onclick: () => openManga(e.mangaId),
     })))) : null,
     section("Popular", popular),
     section("Latest updates", latest));
@@ -245,6 +264,12 @@ async function loadListFor(chapterId) {
   if (mangaId) await loadSeries(mangaId);
 }
 
+// Library cards only store the id, title and cover, so fetch the full series before opening it
+async function openManga(id) {
+  const { data } = await md(`/manga/${id}?includes[]=cover_art`);
+  showChapters(data);
+}
+
 async function showChapters(m) {
   leaveReader();
   setBackdrop(coverOf(m));
@@ -253,6 +278,20 @@ async function showChapters(m) {
   const startBtn = h("button", { className: "primary", disabled: true }, "Loading…");
   const desc = (m.attributes.description?.en || "").split("\n")[0];
 
+  const libBtn = h("button", { className: "chip" });
+  const paintLib = () => {
+    const on = inLibrary(m.id);
+    libBtn.classList.toggle("on", on);
+    libBtn.setAttribute("aria-pressed", String(on));
+    libBtn.textContent = on ? "★ In library" : "☆ Add to library";
+  };
+  libBtn.onclick = () => {
+    const on = toggleLibrary(m);
+    paintLib();
+    toast(on ? "Added to your library" : "Removed from your library");
+  };
+  paintLib();
+
   show(
     h("button", { className: "ghost", onclick: showHome }, "← Home"),
     h("section", { className: "series" },
@@ -260,7 +299,7 @@ async function showChapters(m) {
       h("div", { className: "series-info" },
         h("h1", {}, titleOf(m)),
         desc ? h("p", { className: "desc" }, desc) : null,
-        startBtn)),
+        h("div", { className: "actions" }, startBtn, libBtn))),
     list);
 
   const chapters = await fetchChapters(m.id);

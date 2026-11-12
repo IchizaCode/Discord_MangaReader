@@ -4,6 +4,9 @@ import { WebSocketServer } from "ws";
 const app = express();
 const OK = /(^|\.)mangadex\.(org|network)$/;
 
+// ---------- Serve the built page (NEW) ----------
+app.use(express.static("dist"));
+
 // ---------- MangaDex API proxy ----------
 app.use("/api", async (req, res) => {
   try {
@@ -27,8 +30,10 @@ app.get("/img", async (req, res) => {
   }
 });
 
-// ---------- Start HTTP server ----------
-const server = app.listen(3001, () => console.log("Server running on port 3001"));
+// ---------- Start HTTP server (NEW: only reachable from this machine) ----------
+const server = app.listen(3001, "127.0.0.1", () =>
+  console.log("Server running on http://127.0.0.1:3001")
+);
 
 // ---------- WebSocket sync (reading together) ----------
 const wss = new WebSocketServer({ server, path: "/ws" });
@@ -37,7 +42,6 @@ const rooms = new Map(); // instanceId -> { state, clients }
 wss.on("connection", (ws, req) => {
   const id = new URL(req.url, "http://x").searchParams.get("room");
   if (!id) return ws.close();
-
   const room = rooms.get(id) ?? { state: null, clients: new Set() };
   rooms.set(id, room);
   room.clients.add(ws);

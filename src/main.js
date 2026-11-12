@@ -41,7 +41,7 @@ const store = {
   get(k, fallback) { try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-const settings = { hd: false, mode: "strip", ...store.get("settings", {}) };
+const settings = { hd: false, mode: "strip", rtl: false, ...store.get("settings", {}) };
 const saveSettings = () => store.set("settings", settings);
 const readHistory = () => store.get("history", {});
 
@@ -372,12 +372,24 @@ function readerBar() {
   progressText = h("span", { className: "count muted" });
   progressFill = h("i");
 
+  // Direction only matters in Pages mode, so the chip is hidden in Strip mode
+  const dirLabel = () => (settings.rtl ? "← RTL" : "LTR →");
+  const dir = h("button", { className: "chip", title: "Reading direction (Pages mode)" }, dirLabel());
+  dir.hidden = settings.mode !== "page";
+  dir.onclick = () => {
+    settings.rtl = !settings.rtl;
+    saveSettings();
+    dir.textContent = dirLabel();
+    updateTapTitles(); // tap handlers read settings.rtl on click, so only the tooltips need a refresh
+  };
+
   const modeLabel = () => (settings.mode === "page" ? "▤ Pages" : "▥ Strip");
   const mode = h("button", { className: "chip", title: "Switch reading mode" }, modeLabel());
   mode.onclick = () => {
     settings.mode = settings.mode === "page" ? "strip" : "page";
     saveSettings();
     mode.textContent = modeLabel();
+    dir.hidden = settings.mode !== "page";
     if (atHome) renderPages(currentPage);
   };
 
@@ -400,6 +412,7 @@ function readerBar() {
         saveSettings();
         if (atHome) renderPages(currentPage);
       }),
+      dir,
       mode),
     h("div", { className: "progress" }, progressFill));
 }
@@ -412,6 +425,14 @@ function endCard(group) {
     next
       ? h("button", { className: "primary", onclick: () => pickChapter(next) }, `Next: ${chapterLabel(next)}`)
       : h("p", {}, "You're all caught up."));
+}
+
+// Pages mode direction: left-to-right goes back on the left; right-to-left (manga) goes forward there
+const leftDelta = () => (settings.rtl ? 1 : -1);
+const tapTitle = (d) => (d > 0 ? "Next page" : "Previous page");
+function updateTapTitles() {
+  pagesEl?.querySelector(".tap-left")?.setAttribute("title", tapTitle(leftDelta()));
+  pagesEl?.querySelector(".tap-right")?.setAttribute("title", tapTitle(-leftDelta()));
 }
 
 function renderPages(start = 0) {
@@ -428,8 +449,8 @@ function renderPages(start = 0) {
     pagesEl.className = "pages single";
     pagesEl.replaceChildren(
       pageImg,
-      h("button", { className: "tap tap-left", title: "Previous page", onclick: () => flip(-1) }),
-      h("button", { className: "tap tap-right", title: "Next page", onclick: () => flip(1) }));
+      h("button", { className: "tap tap-left", title: tapTitle(leftDelta()), onclick: () => flip(leftDelta()) }),
+      h("button", { className: "tap tap-right", title: tapTitle(-leftDelta()), onclick: () => flip(-leftDelta()) }));
     showPage(Math.min(start, pageUrls.length - 1));
     updateProgress();
   } else {
@@ -507,8 +528,10 @@ function sharePage() {
 document.addEventListener("keydown", (e) => {
   if (!currentChapterId || e.target.tagName === "INPUT") return;
   if (settings.mode === "page") {
-    if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); flip(1); }
-    else if (e.key === "ArrowLeft") flip(-1);
+    const forward = settings.rtl ? "ArrowLeft" : "ArrowRight";
+    const back = settings.rtl ? "ArrowRight" : "ArrowLeft";
+    if (e.key === forward || e.key === " ") { e.preventDefault(); flip(1); }
+    else if (e.key === back) flip(-1);
   } else if (e.key === "ArrowRight") nextChapter();
   else if (e.key === "ArrowLeft") prevChapter();
 });

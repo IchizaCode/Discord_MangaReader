@@ -1,0 +1,16 @@
+body { margin: 0; background: #1e1f22; color: #dbdee1; font-family: system-ui, sans-serif; }
+#app { max-width: 900px; margin: 0 auto; padding: 16px; }
+button { background: #5865f2; color: #fff; border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+button:disabled { opacity: .4; cursor: default; }
+form { display: flex; gap: 8px; margin-bottom: 16px; }
+input { flex: 1; padding: 8px; border-radius: 6px; border: 0; background: #2b2d31; color: inherit; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.card { display: flex; flex-direction: column; gap: 6px; background: #2b2d31; padding: 8px; text-align: left; }
+.card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 4px; background: #111; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.list button { background: #2b2d31; text-align: left; }
+.nav { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+.pages img { display: block; width: 100%; margin: 0 auto 4px; }
+.error { color: #f23f43; }
+.follow { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.pages img.loading { min-height: 60vh; background: #111; }

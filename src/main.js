@@ -78,6 +78,8 @@ let pageImg = null;
 let pagesEl = null;
 let progressText = null;
 let progressFill = null;
+let pageSlider = null;   // the jump-to-page slider in the reader bar
+let sliding = false;     // true while you're dragging it, so incoming updates don't fight your thumb
 let observer = null;
 let pageTimer = null;
 let homeCache = null;
@@ -178,7 +180,7 @@ function leaveReader() {
   observer?.disconnect();
   clearTimeout(pageTimer);
   currentChapterId = null;
-  progressText = progressFill = null;
+  progressText = progressFill = pageSlider = null;
 }
 
 // ---------- Screen: home ----------
@@ -411,6 +413,24 @@ function readerBar() {
   progressText = h("span", { className: "count muted" });
   progressFill = h("i");
 
+  // Page slider: drag to preview the number, release to jump (and share it with the call)
+  const slider = h("input", { type: "range", className: "scrub", min: 1, max: 1, value: 1, disabled: true, title: "Jump to page" });
+  slider.setAttribute("aria-label", "Jump to page");
+  pageSlider = slider;
+  slider.oninput = () => { if (progressText) progressText.textContent = `${slider.value} / ${slider.max}`; };
+  let byPointer = false; // after a mouse/touch drag, give focus back so the arrow-key shortcuts keep working
+  slider.onchange = () => {
+    sliding = false;
+    jumpTo(Number(slider.value) - 1);
+    if (byPointer) { byPointer = false; slider.blur(); }
+  };
+  slider.onpointerdown = () => { sliding = true; byPointer = true; };
+  slider.onpointerup = slider.onpointercancel = () => { sliding = false; };
+  const progressBox = h("div", { className: "progress" }, progressFill, slider);
+  // In right-to-left Pages mode the bar fills from the right, matching the page order
+  const paintDir = () => { progressBox.style.direction = settings.mode === "page" && settings.rtl ? "rtl" : "ltr"; };
+  paintDir();
+
   // Direction only matters in Pages mode, so the chip is hidden in Strip mode
   const dirLabel = () => (settings.rtl ? "← RTL" : "LTR →");
   const dir = h("button", { className: "chip", title: "Reading direction (Pages mode)" }, dirLabel());
@@ -420,6 +440,7 @@ function readerBar() {
     saveSettings();
     dir.textContent = dirLabel();
     updateTapTitles(); // tap handlers read settings.rtl on click, so only the tooltips need a refresh
+    paintDir();
   };
 
   const modeLabel = () => (settings.mode === "page" ? "▤ Pages" : "▥ Strip");
@@ -429,6 +450,7 @@ function readerBar() {
     saveSettings();
     mode.textContent = modeLabel();
     dir.hidden = settings.mode !== "page";
+    paintDir();
     if (atHome) renderPages(currentPage);
   };
 
@@ -453,7 +475,7 @@ function readerBar() {
       }),
       dir,
       mode),
-    h("div", { className: "progress" }, progressFill));
+    progressBox);
 }
 
 function endCard(group) {
@@ -533,6 +555,18 @@ function goToPage(i) {
   pageChanged();
 }
 
+// A jump you made yourself with the slider, so unlike goToPage it is shared like a normal page turn
+function jumpTo(i) {
+  if (!pageUrls.length) return;
+  i = Math.max(0, Math.min(i, pageUrls.length - 1));
+  if (settings.mode === "page") showPage(i);
+  else {
+    currentPage = i;
+    pageEls[i]?.scrollIntoView({ block: "start" });
+  }
+  pageChanged();
+}
+
 // ---------- Page tracking ----------
 function watchPages() {
   observer = new IntersectionObserver((entries) => {
@@ -556,6 +590,11 @@ function updateProgress() {
   const n = pageUrls.length;
   progressText.textContent = n ? `${currentPage + 1} / ${n}` : "";
   progressFill.style.width = n ? `${((currentPage + 1) / n) * 100}%` : "0";
+  if (pageSlider) {
+    pageSlider.disabled = n < 2;
+    pageSlider.max = Math.max(n, 1);
+    if (!sliding) pageSlider.value = currentPage + 1;
+  }
 }
 
 function sharePage() {

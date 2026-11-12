@@ -118,6 +118,8 @@ h1, h2 { margin: 0; text-wrap: balance; }
 .row > * { scroll-snap-align: start; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px 14px; }
 
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
 .card { display: flex; flex-direction: column; gap: 7px; text-align: left; min-width: 0; border-radius: var(--r); }
 .cover {
   width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px; background: #1e1f22;

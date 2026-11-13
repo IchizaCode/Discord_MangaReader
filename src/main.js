@@ -529,7 +529,11 @@ function renderPages(start = 0) {
 
 function showPage(i) {
   currentPage = i;
-  pageImg.classList.add("loading");
+  // Swap in a fresh <img> instead of changing src: a browser keeps drawing the old picture until the
+  // new one arrives, which made it look like you were still on the previous page.
+  const fresh = h("img", { alt: "", className: "loading", onload: (e) => e.target.classList.remove("loading") });
+  pageImg.replaceWith(fresh);
+  pageImg = fresh;
   pageImg.src = pageUrls[i];
   if (pageUrls[i + 1]) new Image().src = pageUrls[i + 1]; // preload the next page
   window.scrollTo(0, 0);
